@@ -1,0 +1,83 @@
+---
+title: "fk_mockup"
+output: html_document
+---
+
+```{r}
+setwd("~/GitHub/redneck_datawarehouse/fk")
+library(tidyverse)
+library(janitor)
+```
+
+importing test data
+```{r}
+raw_dim <- read_delim("test_data/ex_dim.txt", delim = ",", show_col_types = FALSE) %>% 
+  clean_names()
+
+raw_fact <- read_delim("test_data/ex_fact.txt", delim = ",", show_col_types = FALSE) %>% 
+  clean_names()
+```
+
+making input fact table
+```{r}
+customer_names <- raw_dim %>% 
+  select(customer_sk, id = name)
+
+fact_in <- raw_fact %>% 
+  left_join(customer_names, join_by(customer_sk)) %>% 
+  mutate(transaction_date= ymd(date_key)) %>% 
+  select(-c(customer_sk, sales_id, date_key)) %>% 
+  rename(product = product_id)
+
+
+# ADD SOME DUMMY ROW TO CHECK WHAT HAPPENS WHEN IT CANT BE FOUND
+
+```
+
+making input dim table
+```{r}
+dim_in <- raw_dim %>% 
+  select(-c(customer_sk, customer_id)) %>% 
+  rename(expiry_date = expiration_date) %>% 
+  rename(id = name) %>% 
+  mutate(customer_pk = row_number()) %>% 
+  add_row(
+    customer_pk = 0, 
+    id = "Unknown",
+    city = "Unknown",
+    state = "Unknown",
+    effective_date = ymd("1900/1/1"),
+    expiry_date = ymd("9999/12/31"),
+    is_current = TRUE,
+    .before = 1
+  )
+```
+
+
+```{r}
+primary_keys <- dim_in %>% 
+  select(
+    customer_pk, 
+    id,
+    effective_date,
+    expiry_date
+  )
+
+by <- join_by(
+  id,
+  transaction_date >= effective_date,
+  transaction_date <= expiry_date,
+)
+
+fact_out <- fact_in %>% 
+  left_join(primary_keys, by) %>% 
+  select(-c(effective_date, expiry_date))
+  
+```
+
+
+
+
+
+
+

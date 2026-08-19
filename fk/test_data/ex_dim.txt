@@ -1,0 +1,9 @@
+CustomerSK,CustomerID,Name,City,State,EffectiveDate,ExpirationDate,IsCurrent
+1,101,John Doe,New York,NY,2025-01-01,2025-04-14,False
+2,101,John Doe,Los Angeles,CA,2025-04-15,2025-08-31,False
+3,101,John Doe,San Francisco,CA,2025-09-01,9999-12-31,True
+4,102,Jane Smith,Chicago,IL,2025-01-01,2025-06-30,False
+5,102,Jane Smith,Miami,FL,2025-07-01,9999-12-31,True
+6,103,Bob Johnson,Austin,TX,2025-01-01,9999-12-31,True
+7,104,Alice Brown,Seattle,WA,2025-01-01,9999-12-31,True
+8,105,Charlie Green,Denver,CO,2025-01-01,9999-12-31,True
