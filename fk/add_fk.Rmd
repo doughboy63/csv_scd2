@@ -1,0 +1,115 @@
+---
+title: "fk_mockup"
+output: html_document
+---
+
+```{r}
+setwd("~/GitHub/redneck_datawarehouse/fk")
+library(tidyverse)
+library(janitor)
+```
+
+importing test data
+```{r}
+raw_dim <- read_delim("test_data/ex_dim.txt", delim = ",", show_col_types = FALSE) %>% 
+  clean_names()
+
+raw_fact <- read_delim("test_data/ex_fact.txt", delim = ",", show_col_types = FALSE) %>% 
+  clean_names()
+```
+
+making input fact table
+```{r}
+customer_names <- raw_dim %>% 
+  select(customer_sk, id = name)
+
+fact_in <- raw_fact %>% 
+  left_join(customer_names, join_by(customer_sk)) %>% 
+  mutate(transaction_date= ymd(date_key)) %>% 
+  select(-c(customer_sk, sales_id, date_key)) %>% 
+  rename(product = product_id)
+
+fact_in
+```
+
+making input dim table
+```{r}
+dim_in <- raw_dim %>% 
+  select(-c(customer_sk, customer_id)) %>% 
+  rename(expiry_date = expiration_date) %>% 
+  rename(id = name) %>% 
+  mutate(customer_pk = row_number()) %>% 
+  
+  # adding dummy row
+  add_row(
+    customer_pk = 0, 
+    id = "Unknown",
+    city = "Unknown",
+    state = "Unknown",
+    effective_date = ymd("1900/1/1"),
+    expiry_date = ymd("9999/12/31"),
+    is_current = TRUE,
+    .before = 1
+  )
+
+dim_in
+```
+
+
+
+Function - COPY AND PASTE - only tidyverse is required to run it
+```{r}
+# The below function will take in a to be fact table and add a column of 
+# foreign keys to it using the provided dim table
+
+add_fk <- function(
+  fact_table,   # tibble - fact table
+  fact_id,      # fact table column name - identifier - needs to match up to dim id
+  fk_name,      # string - name of foreign key column to be added to fact table
+  t,            # fact table column name - transaction date
+  dim_table,    # tibble - dimension table
+  dim_id,       # dim table column name - identifier - one row per identifier
+  pk,           # dim table column name - primary key
+  t0,           # dim table column name - effective/start date
+  t1            # dim table column name - expiry/end date
+) {
+  primary_keys <- dim_table %>% 
+    select(c({{pk}}, {{dim_id}}, {{t0}}, {{t1}})) %>% 
+    rename(pk = {{pk}})
+  
+  by <- join_by(
+  {{fact_id}} == {{dim_id}},
+  {{t}} >= {{t0}},
+  {{t}} <= {{t1}}
+  )
+  
+  fact_table %>% 
+    left_join(primary_keys, by) %>% 
+    select(-c({{t0}}, {{t1}})) %>% 
+    mutate(pk = if_else(is.na(pk), 0, pk)) %>% 
+    
+    # need to use walrus operator
+    rename(!!fk_name := pk)
+}
+
+
+```
+
+
+
+testing function
+```{r}
+add_fk(
+  fact_table = fact_in, 
+  fact_id = id,
+  fk_name = "customer_fk",
+  t = transaction_date,
+  dim_table = dim_in, 
+  dim_id = id, 
+  pk = customer_pk,
+  t0 = effective_date,
+  t1 = expiry_date
+)
+```
+
+
